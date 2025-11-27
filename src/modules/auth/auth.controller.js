@@ -17,11 +17,12 @@ class AuthController {
 
     async login(req, res) {
         try {
-            const { phone, otp } = req.body;
+            const { phone, otp, lat, long } = req.body;
+
             if (!isPhone(phone)) return error(res, "Invalid phone", 400);
             if (!isOtp(otp)) return error(res, "Invalid OTP", 400);
 
-            const data = await authService.login(phone, otp);
+            const data = await authService.login(phone, otp, lat, long);
             success(res, data, "Login successful");
         } catch (e) {
             error(res, e.message, e.message === "Invalid OTP" ? 401 : 500);

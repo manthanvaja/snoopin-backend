@@ -7,12 +7,11 @@ class AuthService {
     async findOrCreate(phone) {
         const { data: user, error: selectError } = await supabase
             .from('Users')
-            .select("Id, Phone")
+            .select("Id, Phone, Lat, Long")
             .eq("Phone", phone)
             .single();
 
         if (selectError && selectError.code !== "PGRST116") {
-            console.error("Select error:", selectError);
             throw new Error("Database select error");
         }
 
@@ -24,12 +23,18 @@ class AuthService {
             .select()
             .single();
 
-        if (insertError) {
-            console.error("Insert error:", insertError);
-            throw new Error("Database insert error");
-        }
+        if (insertError) throw new Error("Database insert error");
 
         return newUser;
+    }
+
+    async updateLocation(userId, lat, long) {
+        if (!lat || !long) return;
+
+        await supabase
+            .from("Users")
+            .update({ Lat: lat, Long: long })
+            .eq("Id", userId);
     }
 
     async sendOtp(phone) {
@@ -37,19 +42,18 @@ class AuthService {
         return true;
     }
 
-    async login(phone, otp) {
+    async login(phone, otp, lat, long) {
         if (otp !== OTP) throw new Error("Invalid OTP");
 
         const user = await this.findOrCreate(phone);
 
-        if (!user) {
-            throw new Error("Failed to authenticate user");
-        }
+        // update location
+        await this.updateLocation(user.Id, lat, long);
 
         return {
             user,
             accessToken: makeToken({ id: user.Id, phone }),
-            refreshToken: makeRefresh({ id: user.Id, phone }),
+            refreshToken: makeRefresh({ id: user.Id, phone })
         };
     }
 
