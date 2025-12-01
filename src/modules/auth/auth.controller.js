@@ -40,6 +40,15 @@ class AuthController {
             error(res, "Invalid refresh token", 401);
         }
     }
+
+    async logout(req, res) {
+        try {
+            await authService.logout(req.user.id);
+            success(res, null, "Logged out successfully");
+        } catch (e) {
+            error(res, e.message);
+        }
+    }
 }
 
 export default new AuthController();

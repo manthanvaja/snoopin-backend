@@ -24,16 +24,21 @@ class AuthService {
             .single();
 
         if (insertError) throw new Error("Database insert error");
-
         return newUser;
     }
 
     async updateLocation(userId, lat, long) {
         if (!lat || !long) return;
-
         await supabase
             .from("Users")
             .update({ Lat: lat, Long: long })
+            .eq("Id", userId);
+    }
+
+    async storeRefreshToken(userId, refreshToken) {
+        await supabase
+            .from("Users")
+            .update({ RefreshToken: refreshToken })
             .eq("Id", userId);
     }
 
@@ -46,15 +51,14 @@ class AuthService {
         if (otp !== OTP) throw new Error("Invalid OTP");
 
         const user = await this.findOrCreate(phone);
-
-        // update location
         await this.updateLocation(user.Id, lat, long);
 
-        return {
-            user,
-            accessToken: makeToken({ id: user.Id, phone }),
-            refreshToken: makeRefresh({ id: user.Id, phone })
-        };
+        const accessToken = makeToken({ id: user.Id, phone });
+        const refreshToken = makeRefresh({ id: user.Id, phone });
+
+        await this.storeRefreshToken(user.Id, refreshToken);
+
+        return { user, accessToken, refreshToken };
     }
 
     async refresh(token) {
@@ -62,15 +66,22 @@ class AuthService {
 
         const { data: user, error } = await supabase
             .from('Users')
-            .select("Id, Phone")
+            .select("Id, Phone, RefreshToken")
             .eq("Id", decoded.id)
             .single();
 
-        if (error || !user) {
-            throw new Error("User not found");
+        if (error || !user || user.RefreshToken !== token) {
+            throw new Error("Invalid refresh token");
         }
 
         return { accessToken: makeToken({ id: user.Id, phone: user.Phone }) };
+    }
+
+    async logout(userId) {
+        await supabase
+            .from("Users")
+            .update({ RefreshToken: null })
+            .eq("Id", userId);
     }
 }
 
